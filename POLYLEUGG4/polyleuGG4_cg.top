@@ -1,0 +1,11 @@
+#include "martini.itp"
+
+#include "Protein_A.itp"
+
+[ system ]
+; name
+Martini system from /mnt/d/DE_NOVO_PROTEINS/polyleuGG4.pdb
+
+[ molecules ]
+; name        number
+Protein_A 	 1

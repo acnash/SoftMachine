@@ -1,0 +1,27 @@
+integrator               = steep
+nsteps                   = 100000
+nstxout                  = 1
+nstfout                  = 0
+nstlog                   = 0
+emtol 			 = 750.0
+
+cutoff-scheme            = Verlet
+nstlist                  = 1
+ns_type                  = grid
+pbc                      = xyz
+verlet-buffer-tolerance  = 0.005
+
+
+coulombtype              = reaction-field 
+rcoulomb                 = 1.1
+epsilon_r                = 15    ; 2.5 (with polarizable water)
+epsilon_rf               = 0
+vdw_type                 = cutoff  
+vdw-modifier             = Potential-shift-verlet
+rvdw                     = 1.1
+
+constraints = none
+;constraint_algorithm = lincs
+;lincs-warnangle = 45
+lincs-order=8
+lincs-iter=2

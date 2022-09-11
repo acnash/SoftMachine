@@ -1,0 +1,19 @@
+#include "../martini_3.0.b.3.2/martini_v3.0.b.3.2.itp"
+#include "polyleu_cgA.itp"
+;#include "polyleu_rest.itp"
+#include "../martini_3.0.b.3.2/DPPC_M3.itp"
+#include "../martini_3.0.b.3.2/POPC_M3.itp"
+#include "../martini_3.0.b.3.2/martini_v3.0_solvents.itp"
+
+[ system ]
+; name
+Polyleucine (4) in a DPPC:POPC:CHOL (4:31) solvated bilayer
+
+[ molecules ]
+; name  number
+Protein_A        4
+DPPC            180
+POPC            132
+WN          7822
+NA               127
+CL               127

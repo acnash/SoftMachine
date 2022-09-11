@@ -1,0 +1,207 @@
+from gen_structure import *
+from typing import List
+import os
+import os.path
+from os import path
+
+divideLineStr: str = "--------------------------------------------------------------------------\n"
+supressOutputBool: bool = False
+
+print("###################################################################")
+print("#                                                                 #")
+print("# .▄▄ ·       ·▄▄▄▄▄▄▄▄    • ▌ ▄ ·.  ▄▄▄·  ▄▄·  ▄ .▄▪   ▐ ▄ ▄▄▄ . #")
+print("# ▐█ ▀. ▪     ▐▄▄·•██      ·██ ▐███▪▐█ ▀█ ▐█ ▌▪██▪▐███ •█▌▐█▀▄.▀· #")
+print("# ▄▀▀▀█▄ ▄█▀▄ ██▪  ▐█.▪    ▐█ ▌▐▌▐█·▄█▀▀█ ██ ▄▄██▀▐█▐█·▐█▐▐▌▐▀▀▪▄ #")
+print("# ▐█▄▪▐█▐█▌.▐▌██▌. ▐█▌·    ██ ██▌▐█▌▐█ ▪▐▌▐███▌██▌▐▀▐█▌██▐█▌▐█▄▄▌ #")
+print("#  ▀▀▀▀  ▀█▄▀▪▀▀▀  ▀▀▀     ▀▀  █▪▀▀▀ ▀  ▀ ·▀▀▀ ▀▀▀ ·▀▀▀▀▀ █▪ ▀▀▀  #")
+print("#                                                                 #")
+print("#             By Anthony Nash (2021) - University of Oxford       #")
+print("###################################################################")
+print("\n")
+
+###########################################################################################
+#Prepare dirctory structure
+###########################################################################################
+print("0. Preparing file structure.")
+popSizeInt: int = 5
+parentDirStr: str = "/home/ubuntu/DE_NOVO_PROTEINS/"
+epocInitialDirStr: str = parentDirStr + "EPOC_0/"
+scriptsDirStr: str = parentDirStr + "SCRIPTS/"
+
+#build the initial epoc directory
+if not path.exists(epocInitialDirStr):
+    os.makedirs(epocInitialDirStr)
+
+#then each of individual directories (inside the initial epoc)
+for i in range(popSizeInt):
+    dirStr: str = epocInitialDirStr + str(i)
+    if not path.exists(dirStr):
+        os.makedirs(dirStr)
+
+print(divideLineStr)
+
+###########################################################################################
+#Build the initial population
+###########################################################################################
+
+availableAAList: List = ["R", "H", "D", "K", "E", "S", "T", "N", "Q", "C", "G", "P", "A", "V", "I", "L", "M", "F", "Y", "W"]
+scafSequenceStr: str = "LLLLLLGLLLGLLLLLL"
+numChangesToMakeInt: int = 8
+terminalNStr: str = "KRSN"
+terminalCStr: str = "NSRK"
+populationList: List = []
+n = 0
+
+#loops 0 to the popSizeInt-1 
+print("1. Building initial population.")
+while n < popSizeInt:
+    imutableAAPositionList: List = [6,10]
+    newDesignStr: str = design_sequence(availableAAList, scafSequenceStr, imutableAAPositionList, numChangesToMakeInt)
+    freeEnergyInsertFlt = test_hydrophobicity(newDesignStr, supressOutputBool)
+    if freeEnergyInsertFlt < 0.0:
+        if newDesignStr not in populationList:
+            newDesignStr = terminalNStr + newDesignStr + terminalCStr
+            populationList.append(newDesignStr)
+            n = n + 1
+            #print(newDesignStr, " ", freeEnergyInsertFlt)
+
+print("Population size: ", len(populationList))
+print(divideLineStr)
+
+###########################################################################################
+#Construct the helix using Modeller
+###########################################################################################
+print("2. Constructing helix files.")
+for i in range(len(populationList)): 
+    sequenceStr = populationList[i]
+    fileLocationStr: str = epocInitialDirStr + str(i) + "/"
+    build_helix(sequenceStr, fileLocationStr)
+
+print(divideLineStr)
+
+###########################################################################################
+#Convert to CG using martinize
+###########################################################################################
+print("3. Convert helices into CG and construct CG model.")
+for i in range(len(populationList)):
+    inputFileStr: str = epocInitialDirStr + str(i) + "/helix_rotated.pdb"
+    if path.exists(fileLocationStr):
+        topFileStr: str = epocInitialDirStr + str(i) + "/helix_cg.top"
+        outputPDBFileStr: str = epocInitialDirStr + str(i) + "/helix_cg.pdb"
+        itpFileStr: str = epocInitialDirStr + str(i) + "/Protein_A.itp"
+        build_martinize(inputFileStr, topFileStr, outputPDBFileStr, itpFileStr, supressOutputBool)
+    else:
+        raise FileNotFoundError("Error: File not found whilst building CG structures.")
+
+print("Finished building CG helix topology (top) and coordinate (pdb) files.")
+print(divideLineStr)
+
+###########################################################################################
+#Copy the helix files (three times) and move them into place
+###########################################################################################
+print("4. Copy the helix files (three times) and move them into place.")
+#template coordinate data
+#these are nanometers (for gromacs - PDB require angstrom)
+
+numHelicesInt: int = 4
+
+xCoordList = [2.263, 2.166, 6.980, 7.040]
+yCoordList = [2.252, 6.994, 1.876, 6.672]
+zCoordList = [6.623, 6.427, 6.774, 6.868]
+
+for i in range(len(populationList)):
+    for n in range(numHelicesInt):
+        copyCommandList = ["cp", epocInitialDirStr + str(i) + "/helix_cg.pdb", epocInitialDirStr + str(i) + "/helix_translated_" + str(n) + "_cg.pdb"]
+        result = subprocess.run(copyCommandList, capture_output=True, text=True)
+        if supressOutputBool == False:
+            print("stderr:", result.stderr)
+            print("stdout:", result.stdout)
+
+        inputFileStr: str = epocInitialDirStr + str(i) + "/helix_cg.pdb"
+        #the next line translate the helix and converts the output from pdb to gro
+        outputFileStr: str = epocInitialDirStr + str(i) + "/helix_translated_" + str(n) + "_cg.gro"
+        moveHelix(inputFileStr, outputFileStr, xCoordList[n], yCoordList[n], zCoordList[n], supressOutputBool)
+print(divideLineStr)
+
+###########################################################################################
+#Write the TOP file, restraint file and construct the combined GRO file
+###########################################################################################
+print("4. Write the TOP file, restraint file and construct the combined GRO file.")
+for i in range(popSizeInt):
+    #build the restraint file for the helices
+    outputRestFileStr: str = epocInitialDirStr + str(i) + "/Protein_restr_A.itp"
+    groFileStr: str = epocInitialDirStr + str(i) + "/helix_cg.pdb"
+    systemInpFileStr: str = scriptsDirStr + "System.inp"
+    restrCommandList = ["gmx", "genrestr", "-f", groFileStr, "-o", outputRestFileStr]
+    with open(systemInpFileStr, "r") as systemInpFileObj:
+        resultRestr = subprocess.run(restrCommandList, stdin=systemInpFileObj)
+        if supressOutputBool == False:
+            print("stderr:", resultRestr.stderr)
+            print("stdout:", resultRestr.stdout)
+    systemInpFileObj.close()
+
+    #get peptide charge (which will be *4)
+    chargeInt: int = calculate_peptide_charge(populationList[i]) * 4
+
+    #construct the system level topology file
+    topFileStr = epocInitialDirStr + str(i) + "/system.top"
+    itpFileStr = epocInitialDirStr + str(i) + "/Protein_A.itp"
+    sequenceStr = populationList[i]
+    restraintsFileStr = epocInitialDirStr + str(i) + "/Protein_restr_A.itp"
+    #the returning naCountInt and clCountInt are the number of ions to keep in the final gro file
+    naCountInt, clCountInt = write_top_file(topFileStr, itpFileStr, sequenceStr, False, restraintsFileStr, chargeInt)
+
+    #write the combined gro file
+    bilayerGroFileStr: str = scriptsDirStr + "temp_template.gro"
+    helix0GroFileStr: str = epocInitialDirStr + str(i) + "/helix_translated_0_cg.gro"
+    helix1GroFileStr: str = epocInitialDirStr + str(i) + "/helix_translated_1_cg.gro"
+    helix2GroFileStr: str = epocInitialDirStr + str(i) + "/helix_translated_2_cg.gro"
+    helix3GroFileStr: str = epocInitialDirStr + str(i) + "/helix_translated_3_cg.gro"
+    inputFileList = [bilayerGroFileStr, helix0GroFileStr, helix1GroFileStr, helix2GroFileStr, helix3GroFileStr]
+    outputFileStr: str = epocInitialDirStr + str(i) + "/combined.gro"
+    write_gro_file(inputFileList, outputFileStr)
+
+    #adjust the charge on the water (these are the number of ions we need)
+    adjustCharge(outputFileStr, outputFileStr, naCountInt, clCountInt)
+
+    #reorder the atom number (index) in the gro files
+    commandList = ["gmx", "editconf", "-f", outputFileStr, "-o", outputFileStr]
+    reorderResult = subprocess.run(commandList, capture_output=True, text=True)
+    if supressOutputBool == False:
+        print("stdout:", reorderResult.stdout)
+        print("stderr:", reorderResult.stderr)
+
+    #build the index file required for all NVT/NPT simulations
+    indexFileStr: str = epocInitialDirStr + str(i) + "/index.ndx"
+    indexInpFileStr: str = scriptsDirStr + "indexInput.inp"
+    run_make_index(outputFileStr, indexFileStr, indexInpFileStr, supressOutputBool)
+print(divideLineStr)
+
+###########################################################################################
+#Performing energy minimisation for initial epoc
+###########################################################################################
+print("5. Performing energy minimisation for initial epoc.")
+for i in range(popSizeInt):
+    mdpFileStr: str = parentDirStr + "minimization.mdp"
+    groFileStr: str = epocInitialDirStr + str(i) + "/combined.gro"
+    restrFileStr: str = epocInitialDirStr + str(i) + "/helix_translated_0_cg.gro"
+    topFileStr: str = epocInitialDirStr + str(i) + "/system.top"
+    outputFileStr: str = epocInitialDirStr + str(i) + "/minimization.tpr"
+    run_grompp(mdpFileStr, groFileStr, topFileStr, outputFileStr, supressOutputBool)
+    
+    deffnmFileStr: str = epocInitialDirStr + str(i) + "/minimization"    
+    run_simulation(deffnmFileStr, outputFileStr, False, 16, supressOutputBool)
+
+###########################################################################################
+#Performing a set of NPT simulations for initial epoc
+###########################################################################################
+print("6. Performing a set of NPT simulations for initial epoc.")
+for i in range(popSizeInt):
+    mdpFileStr: str = parentDirStr + "NPT_eq.mdp"
+    groFileStr: str = epocInitialDirStr + str(i) + "/minimization.gro"
+    topFileStr: str = epocInitialDirStr + str(i) + "/system.top"
+    outputFileStr: str = epocInitialDirStr + str(i) + "/npt_eq.tpr"
+    run_grompp(mdpFileStr, groFileStr, topFileStr, outputFileStr, supressOutputBool)
+
+    deffnmFileStr: str = epocInitialDirStr + str(i) + "/npt_eq"
+    run_simulation(deffnmFileStr, outputFileStr, False, 24, supressOutputBool)
